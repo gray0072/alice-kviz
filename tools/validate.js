@@ -9,9 +9,11 @@ const { tokens } = require('../src/matcher');
 const { handleTurn } = require('../src/game');
 const { poolFor, QUIZ_LENGTH } = require('../src/selector');
 const { REACTIONS, RECENT } = require('../src/reactions');
+const { TIERS, RECENT_TITLES } = require('../src/titles');
 
 const LIMITS = { q: 170, option: 80, why: 200, reaction: 80, response: 1024 };
 const MIN_REACTIONS = { right: 50, trick: 30, silly: 30 };
+const MIN_TITLES = 20;
 const NUMBER_WORDS = new Set(['один', 'одна', 'два', 'две', 'три', 'первый', 'второй', 'третий']);
 
 const errors = [];
@@ -55,6 +57,20 @@ for (const [kind, list] of Object.entries(REACTIONS)) {
     }
   }
 }
+
+// Звания: по MIN_TITLES на уровень, без повторов во всей игре, без рода ребёнка.
+const allTitles = new Set();
+TIERS.forEach((tier, i) => {
+  if (tier.names.length < MIN_TITLES) errors.push(`званий уровня ${i}: ${tier.names.length}, нужно от ${MIN_TITLES}`);
+  if (tier.names.length <= RECENT_TITLES) errors.push(`званий уровня ${i}: ${tier.names.length}, а не повторять нужно ${RECENT_TITLES} последних`);
+  for (const t of tier.names) {
+    if (allTitles.has(t.toLowerCase())) errors.push(`звание повторяется: ${t}`);
+    allTitles.add(t.toLowerCase());
+    if (/(^|[^а-яё])(умник|умница|король|королева|принц|принцесса|шутник|шутница)([^а-яё]|$)/i.test(t)) {
+      warnings.push(`звание указывает род ребёнка: ${t}`);
+    }
+  }
+});
 
 // Худший случай по длине: реакция на ответ + объяснение + следующий вопрос.
 // Прогоняем каждую пару (вопрос, следующий вопрос) через настоящую логику.

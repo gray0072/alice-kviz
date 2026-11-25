@@ -8,6 +8,7 @@ const { P, SOUNDS, ORDINALS, OPTION_WORDS, otherLevel, otherCount } = require('.
 const { parseAnswer, parseSettings, detectCommands, exactCommand, COUNTS } = require('./matcher');
 const { pickQuestions, rememberRecent, QUIZ_LENGTH } = require('./selector');
 const { pickReaction } = require('./reactions');
+const { pickTitle } = require('./titles');
 const { shuffle, pick } = require('./random');
 
 // Состояния сессии (session.st)
@@ -99,19 +100,20 @@ function startGame(reply, { lv, n }, app, rng, { hint = false, rx } = {}) {
   return { session, app: nextApp };
 }
 
-function finish(reply, session) {
+// Итог игры. Звание выбирается без повторов недавних, память званий — на колонке (app.tt).
+function finish(reply, session, app, rng) {
   const total = session.ids.length;
   reply.say(P.finished(session.sc, total, plural(session.sc, P.pointWords)));
-  const title = P.titles.find((t) => session.sc >= t.min * total);
+  const title = pickTitle(session.sc, total, app.tt, rng);
   reply.say(title.text);
   if (session.sl > 0) reply.say(P.sillyCount(session.sl, plural(session.sl, P.sillyWords)));
   reply.pause(500).say(P.playAgain);
   const end = { st: ST.END, lv: session.lv, n: total };
   if (session.rx) end.rx = session.rx;
-  return end;
+  return { session: end, app: { ...app, tt: title.memory } };
 }
 
-function answer(reply, session, choice, rng) {
+function answer(reply, session, app, choice, rng) {
   const q = BY_ID.get(session.ids[session.i]);
   const kind = choice ? session.ord[choice - 1] : null;
   const s = { ...session };
@@ -127,10 +129,10 @@ function answer(reply, session, choice, rng) {
   }
   reply.say(q.why).pause(700);
   s.i += 1;
-  if (s.i >= s.ids.length) return finish(reply, s);
+  if (s.i >= s.ids.length) return finish(reply, s, app, rng);
   s.ord = newOrder(rng);
   sayQuestion(reply, s);
-  return s;
+  return { session: s, app };
 }
 
 /**
@@ -179,7 +181,7 @@ function changeInGame(reply, session, app, set, rng) {
       if (s.i >= s.ids.length) {
         // Ответов уже столько, сколько теперь вопросов в игре: подводим итоги.
         reply.say(P.gameShortened);
-        return { session: finish(reply, s), app: a };
+        return finish(reply, s, a, rng);
       }
     }
   }
@@ -240,14 +242,14 @@ function handleTurn(input, rng = Math.random) {
     if (set && (set.marked || !choice)) {
       ({ session, app } = changeInGame(reply, session, app, set, rng));
     } else if (choice) {
-      session = answer(reply, session, choice, rng);
+      ({ session, app } = answer(reply, session, app, choice, rng));
     } else if (cmds.has('help')) {
       reply.say(P.rules).pause(500);
       sayQuestion(reply, session);
     } else if (cmds.has('repeat')) {
       sayQuestion(reply, session);
     } else if (cmds.has('skip')) {
-      session = answer(reply, session, null, rng);
+      ({ session, app } = answer(reply, session, app, null, rng));
     } else if (cmds.has('change')) {
       reply.say(P.changeHint(session.lv, session.ids.length)).pause(300);
       sayQuestion(reply, session);

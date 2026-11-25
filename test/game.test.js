@@ -49,7 +49,7 @@ test('полная игра: 5 вопросов, итог с очками и з�
   }
   assert.equal(d.session.st, 'end');
   assert.match(res.response.text, /У тебя 5 очков из 5/);
-  assert.match(res.response.text, /мастер жизненных ситуаций/);
+  assert.match(res.response.text, /высший балл! Звание — /);
   assert.match(res.response.text, /Сыграем ещё/);
 });
 
@@ -252,15 +252,41 @@ test('запуск сразу с уровнем: «запусти навык …
 
 test('звание зависит от доли правильных ответов', () => {
   const { handleTurn } = require('../src/game');
+  const { TIERS } = require('../src/titles');
   const ids = pickIds();
-  const cases = [[4, /У тебя 5 очков из 5.*мастер/s], [3, /У тебя 4 очка из 5.*знаток/s], [2, /У тебя 3 очка из 5.*путешественник/s], [0, /У тебя 1 очко из 5.*выдумщик/s]];
-  for (const [sc, re] of cases) {
+  // [очки до последнего ответа, итог, уровень звания]
+  const cases = [[4, /У тебя 5 очков из 5/, 0], [3, /У тебя 4 очка из 5/, 1], [2, /У тебя 3 очка из 5/, 2], [0, /У тебя 1 очко из 5/, 3]];
+  for (const [sc, re, tier] of cases) {
     const session = { st: 'q', lv: 1, ids, i: ids.length - 1, sc, sl: 0, ord: 'rts' };
     const out = handleTurn({ utterance: 'один', session, app: {} }, seeded(1));
     assert.equal(out.session.st, 'end');
     assert.match(out.text, re);
+    const name = TIERS[tier].names.find((t) => out.text.includes(`Звание — ${t}!`));
+    assert.ok(name, `звание уровня ${tier} в «${out.text}»`);
+    assert.ok(out.text.includes(TIERS[tier].after));
     assert.match(out.text, /Сыграем ещё/);
   }
+});
+
+test('звания не повторяются подряд и запоминаются на колонке', () => {
+  const { handleTurn } = require('../src/game');
+  const { TIERS, RECENT_TITLES } = require('../src/titles');
+  const ids = pickIds();
+  const rng = seeded(3);
+  let app = {};
+  const heard = [];
+  for (let game = 0; game < 30; game++) {
+    const session = { st: 'q', lv: 1, ids, i: ids.length - 1, sc: ids.length - 1, sl: 0, ord: 'rts' };
+    const out = handleTurn({ utterance: 'один', session, app }, rng);
+    app = out.app;
+    heard.push(TIERS[0].names.find((t) => out.text.includes(`Звание — ${t}!`)));
+  }
+  for (let i = 0; i < heard.length; i++) {
+    const window = heard.slice(Math.max(0, i - RECENT_TITLES), i);
+    assert.ok(!window.includes(heard[i]), `«${heard[i]}» повторилось раньше, чем через ${RECENT_TITLES} игр`);
+  }
+  assert.ok(new Set(heard).size >= 15);
+  assert.ok(JSON.stringify(app).length < 1024);
 });
 
 function pickIds() {
