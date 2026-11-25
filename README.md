@@ -37,6 +37,7 @@
   - [06 — техническая спецификация](docs/06-tech-spec.md)
   - [07 — тестирование](docs/07-testing.md)
   - [08 — развитие](docs/08-roadmap.md)
+  - [09 — план наполнения банка вопросов](docs/09-content-plan.md)
 - Вопросы: [data/questions/](data/questions/)
 - Код навыка: [src/](src/)
 

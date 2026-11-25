@@ -38,6 +38,7 @@ changed by voice in the middle of a game.
   - [06 — technical spec](docs/06-tech-spec.md)
   - [07 — testing](docs/07-testing.md)
   - [08 — roadmap](docs/08-roadmap.md)
+  - [09 — question bank plan](docs/09-content-plan.md)
 - Questions: [data/questions/](data/questions/)
 - Skill code: [src/](src/)
 
