@@ -3,8 +3,10 @@
 // Проверка банка вопросов: структура, уникальность, длины, баланс уровней.
 // Запуск: npm run validate
 
-const { QUESTIONS } = require('../data/questions');
+const { QUESTIONS, SETS } = require('../data/questions');
 const { PLACES, TOPICS } = require('../data/places');
+const { FOCUSES, AXES, SKILLS, POLES } = require('../data/axes');
+const TARGETS = require('./targets');
 const { tokens } = require('../src/matcher');
 const { handleTurn } = require('../src/game');
 const { poolFor, QUIZ_LENGTH } = require('../src/selector');
@@ -14,6 +16,9 @@ const { TIERS, RECENT_TITLES } = require('../src/titles');
 const LIMITS = { q: 170, option: 80, why: 200, reaction: 80, response: 1024 };
 const MIN_REACTIONS = { right: 50, trick: 30, silly: 30, guessTrick: 20, guessSilly: 20 };
 const KINDS = [undefined, 'guess']; // kind вопроса: обычный или загадка «В чём дело?» / «Правда или выдумка?»
+const FUNS = [undefined, 0, 1, 2]; // fun: нет поля — 0
+// Первая цифра id — набор; после x99 идут четырёхзначные номера с той же цифрой.
+const SET_DIGIT = { school: '1', home: '2', city: '3', travel: '4', friends: '5', family: '6' };
 const MIN_TITLES = 20;
 const NUMBER_WORDS = new Set(['один', 'одна', 'два', 'две', 'три', 'первый', 'второй', 'третий']);
 
@@ -23,7 +28,7 @@ const ids = new Set();
 
 for (const q of QUESTIONS) {
   const where = `#${q.id}`;
-  for (const f of ['id', 'place', 'level', 'topic', 'q', 'right', 'trick', 'silly', 'why']) {
+  for (const f of ['id', 'place', 'level', 'topic', 'focus', 'q', 'right', 'trick', 'silly', 'why']) {
     if (q[f] === undefined || q[f] === '') errors.push(`${where}: нет поля ${f}`);
   }
   if (ids.has(q.id)) errors.push(`${where}: повторяющийся id`);
@@ -31,6 +36,13 @@ for (const q of QUESTIONS) {
   if (!PLACES[q.place]) errors.push(`${where}: неизвестное место «${q.place}»`);
   if (!TOPICS[q.topic]) errors.push(`${where}: неизвестная тема «${q.topic}»`);
   if (!KINDS.includes(q.kind)) errors.push(`${where}: kind может быть только 'guess'`);
+  if (!Number.isInteger(q.id) || q.id < 101 || q.id > 9999 || String(q.id)[0] !== SET_DIGIT[q.set]) {
+    errors.push(`${where}: id набора ${q.set} — ${SET_DIGIT[q.set]}01–${SET_DIGIT[q.set]}99 или ${SET_DIGIT[q.set]}000–${SET_DIGIT[q.set]}999`);
+  }
+  if (q.focus !== undefined && !FOCUSES[q.focus]) errors.push(`${where}: focus может быть ${Object.keys(FOCUSES).join(', ')}`);
+  if (q.pole !== undefined && !POLES.includes(q.pole)) errors.push(`${where}: неизвестный край «${q.pole}» (нужно '<ось>-' или '<ось>+' из data/axes.js)`);
+  if (q.skill !== undefined && !SKILLS[q.skill]) errors.push(`${where}: неизвестный навык «${q.skill}»`);
+  if (!FUNS.includes(q.fun)) errors.push(`${where}: fun может быть 0, 1 или 2`);
   if (![1, 2].includes(q.level)) errors.push(`${where}: level должен быть 1 или 2`);
   if (q.q.length > LIMITS.q) warnings.push(`${where}: длинный вопрос (${q.q.length} > ${LIMITS.q})`);
   if (q.why.length > LIMITS.why) warnings.push(`${where}: длинное объяснение (${q.why.length} > ${LIMITS.why})`);
@@ -43,6 +55,16 @@ for (const q of QUESTIONS) {
     if (nums.length) warnings.push(`${where}: в варианте есть числительное «${nums[0]}» — ребёнок может спутать с номером ответа`);
   }
 }
+
+// Цели наполнения: наборы и места из tools/targets.js существуют, у осей и навыков есть названия.
+for (const [set, places] of Object.entries(TARGETS.PLACES)) {
+  if (!SETS[set]) errors.push(`tools/targets.js: неизвестный набор «${set}»`);
+  for (const p of Object.keys(places)) if (!PLACES[p]) errors.push(`tools/targets.js: место «${p}» не добавлено в data/places.js`);
+}
+for (const set of Object.keys(TARGETS.FOCUS)) if (!SETS[set]) errors.push(`tools/targets.js: неизвестный набор «${set}»`);
+for (const set of Object.keys(SETS)) if (!SET_DIGIT[set]) errors.push(`набор ${set}: нет первой цифры id в SET_DIGIT`);
+for (const [key, a] of Object.entries(AXES)) if (!a.title || !a.minus || !a.plus) errors.push(`ось ${key}: нужны title, minus и plus`);
+for (const [key, s] of Object.entries(SKILLS)) if (!s.title) errors.push(`навык ${key}: нужен title`);
 
 // Реакции: сколько их, длина, повторы, обращение без рода.
 for (const [kind, list] of Object.entries(REACTIONS)) {
