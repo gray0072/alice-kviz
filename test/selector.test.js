@@ -84,8 +84,14 @@ test('когда забавных (fun: 2) хотя бы MIN_FUN_POOL, в каж
       }
     }
   }
-  // Пока забавных мало, подбор их не навязывает: в банке их нет — и игра собирается как раньше.
-  assert.equal(QUESTIONS.filter((q) => q.fun === 2).length < MIN_FUN_POOL, true);
+  // Настоящий банк: на уровне, где забавных набралось MIN_FUN_POOL, они есть в каждой игре.
+  for (const lv of [1, 2]) {
+    if (poolFor(lv).filter((q) => q.fun === 2).length < MIN_FUN_POOL) continue;
+    for (let seed = 1; seed <= 50; seed++) {
+      const qs = pickQuestions(lv, [], seeded(seed)).map((id) => BY_ID.get(id));
+      assert.ok(qs.some((q) => q.fun === 2), `seed ${seed}, уровень ${lv}: нет забавного`);
+    }
+  }
 });
 
 test('application_state влезает в лимит и с четырёхзначными id', () => {
