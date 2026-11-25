@@ -81,6 +81,36 @@ test('правильный, с подвохом и вредный совет д�
   assert.equal(d.session.i, 1);
 });
 
+test('в загадке (kind: guess) свои реакции, и смешная версия не считается вредным советом', () => {
+  const { REACTIONS } = require('../src/reactions');
+  const d = device(11);
+  d.say('');
+  d.say('лёгкий');
+  const id = d.session.ids[0];
+  const original = BY_ID.get(id);
+  BY_ID.set(id, { ...original, kind: 'guess' });
+  try {
+    const silly = d.session.ord.indexOf('s') + 1;
+    const res = d.say(String(silly));
+    assert.ok(REACTIONS.guessSilly.some((r) => res.response.text.startsWith(r)), res.response.text.slice(0, 60));
+    assert.match(res.response.text, /Правильный ответ: /);
+    assert.equal(d.session.sl, 0);
+    assert.ok(d.session.rx.guessSilly.length === 1);
+  } finally {
+    BY_ID.set(id, original);
+  }
+  const id2 = d.session.ids[1];
+  const original2 = BY_ID.get(id2);
+  BY_ID.set(id2, { ...original2, kind: 'guess' });
+  try {
+    const trick = d.session.ord.indexOf('t') + 1;
+    const res = d.say(String(trick));
+    assert.ok(REACTIONS.guessTrick.some((r) => res.response.text.startsWith(r)), res.response.text.slice(0, 60));
+  } finally {
+    BY_ID.set(id2, original2);
+  }
+});
+
 test('уровень запоминается на устройстве: при следующем запуске игра начинается сразу, без вопросов', () => {
   const d = device(2);
   d.say('');
@@ -202,7 +232,7 @@ test('реакции не повторяются в серии из трёх о�
   d.say('лёгкий');
   d.say('десять вопросов');
   const { REACTIONS } = require('../src/reactions');
-  const all = [...REACTIONS.right, ...REACTIONS.trick, ...REACTIONS.silly, ...REACTIONS.skipped];
+  const all = Object.values(REACTIONS).flat();
   const seen = [];
   for (let g = 0; g < 4; g++) {
     while (d.session.st === 'q') {

@@ -12,7 +12,8 @@ const { REACTIONS, RECENT } = require('../src/reactions');
 const { TIERS, RECENT_TITLES } = require('../src/titles');
 
 const LIMITS = { q: 170, option: 80, why: 200, reaction: 80, response: 1024 };
-const MIN_REACTIONS = { right: 50, trick: 30, silly: 30 };
+const MIN_REACTIONS = { right: 50, trick: 30, silly: 30, guessTrick: 20, guessSilly: 20 };
+const KINDS = [undefined, 'guess']; // kind вопроса: обычный или загадка «В чём дело?» / «Правда или выдумка?»
 const MIN_TITLES = 20;
 const NUMBER_WORDS = new Set(['один', 'одна', 'два', 'две', 'три', 'первый', 'второй', 'третий']);
 
@@ -29,6 +30,7 @@ for (const q of QUESTIONS) {
   ids.add(q.id);
   if (!PLACES[q.place]) errors.push(`${where}: неизвестное место «${q.place}»`);
   if (!TOPICS[q.topic]) errors.push(`${where}: неизвестная тема «${q.topic}»`);
+  if (!KINDS.includes(q.kind)) errors.push(`${where}: kind может быть только 'guess'`);
   if (![1, 2].includes(q.level)) errors.push(`${where}: level должен быть 1 или 2`);
   if (q.q.length > LIMITS.q) warnings.push(`${where}: длинный вопрос (${q.q.length} > ${LIMITS.q})`);
   if (q.why.length > LIMITS.why) warnings.push(`${where}: длинное объяснение (${q.why.length} > ${LIMITS.why})`);
@@ -80,8 +82,9 @@ const longestNext = QUESTIONS.slice().sort((a, b) =>
   (b.q.length + b.right.length + b.trick.length + b.silly.length) - (a.q.length + a.right.length + a.trick.length + a.silly.length))[0];
 const session = { st: 'q', lv: 2, ids: [longestAfter.id, longestNext.id], i: 0, sc: 0, sl: 0, ord: 'srt' };
 const turn = handleTurn({ utterance: 'один', session, app: {} }, () => 0);
-// rng = 0 берёт первую реакцию; добавляем запас до самой длинной реакции на подвох или вредный совет.
-const reactionSlack = Math.max(...REACTIONS.trick.concat(REACTIONS.silly).map((r) => r.length)) - REACTIONS.silly[0].length;
+// rng = 0 берёт первую реакцию; добавляем запас до самой длинной реакции на неправильный ответ (и в загадках тоже).
+const wrongReactions = [...REACTIONS.trick, ...REACTIONS.silly, ...REACTIONS.guessTrick, ...REACTIONS.guessSilly];
+const reactionSlack = Math.max(...wrongReactions.map((r) => r.length)) - REACTIONS.silly[0].length;
 const worst = { text: turn.text.length + reactionSlack, tts: turn.tts.length + reactionSlack };
 for (const [field, value] of Object.entries(worst)) {
   if (value > LIMITS.response) errors.push(`самый длинный ответ (${field}) — ${value} символов, лимит Алисы ${LIMITS.response}`);
@@ -95,7 +98,7 @@ for (const w of warnings) console.log('ПРЕДУПРЕЖДЕНИЕ', w);
 for (const e of errors) console.log('ОШИБКА', e);
 console.log(`Вопросов: ${QUESTIONS.length} (уровень 1: ${l1}, уровень 2: ${l2}). ` +
   `Мест: ${new Set(QUESTIONS.map((q) => q.place)).size}, тем: ${new Set(QUESTIONS.map((q) => q.topic)).size}. ` +
-  `Реакций: ${REACTIONS.right.length} на правильный, ${REACTIONS.trick.length} на подвох, ${REACTIONS.silly.length} на вредный совет. ` +
+  `Реакций: ${REACTIONS.right.length} на правильный, ${REACTIONS.trick.length} на подвох, ${REACTIONS.silly.length} на вредный совет, ${REACTIONS.guessTrick.length} + ${REACTIONS.guessSilly.length} в загадках. ` +
   `Самый длинный ответ: ${worst.text} символов текста, ${worst.tts} tts.`);
 if (errors.length) {
   console.log(`Найдено ошибок: ${errors.length}`);

@@ -16,6 +16,8 @@ const ST = { LEVEL: 'level', QUESTION: 'q', END: 'end' };
 const KINDS = ['r', 't', 's']; // right, trick, silly
 const FIELD = { r: 'right', t: 'trick', s: 'silly' };
 const REACTION_KIND = { r: 'right', t: 'trick', s: 'silly' };
+// Вопросы-загадки (kind: 'guess'): варианты — версии, а не советы, у них свои реакции.
+const GUESS_REACTION_KIND = { r: 'right', t: 'guessTrick', s: 'guessSilly' };
 const HINT_TIMES = 3; // сколько запусков подсказывать, как поменять уровень и число вопросов
 
 function soundsOn() {
@@ -117,14 +119,17 @@ function answer(reply, session, app, choice, rng) {
   const q = BY_ID.get(session.ids[session.i]);
   const kind = choice ? session.ord[choice - 1] : null;
   const s = { ...session };
-  const reaction = pickReaction(kind ? REACTION_KIND[kind] : 'skipped', s.rx, rng);
+  const guess = q.kind === 'guess';
+  const kinds = guess ? GUESS_REACTION_KIND : REACTION_KIND;
+  const reaction = pickReaction(kind ? kinds[kind] : 'skipped', s.rx, rng);
   s.rx = reaction.memory;
   if (kind === 'r') {
     s.sc += 1;
     reply.sound(SOUNDS.right).say(reaction.text);
   } else {
     if (kind === 't') reply.sound(SOUNDS.wrong);
-    if (kind === 's') s.sl += 1;
+    // Смешная версия в загадке — не вредный совет, в итоговый счёт советов не идёт.
+    if (kind === 's' && !guess) s.sl += 1;
     reply.say(reaction.text).say(P.correctIs(dot(q.right)));
   }
   reply.say(q.why).pause(700);
