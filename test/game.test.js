@@ -72,13 +72,21 @@ test('правильный, с подвохом и вредный совет д�
   const d = device(11);
   d.say('');
   d.say('лёгкий');
-  const q = BY_ID.get(d.session.ids[0]);
-  const silly = d.session.ord.indexOf('s') + 1;
-  const res = d.say(String(silly));
-  assert.match(res.response.text, new RegExp(`Правильный ответ: ${q.right.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
-  assert.equal(d.session.sc, 0);
-  assert.equal(d.session.sl, 1);
-  assert.equal(d.session.i, 1);
+  const id = d.session.ids[0];
+  const q = BY_ID.get(id);
+  // Первым может выпасть загадка, а у неё смешная версия — не вредный совет: делаем вопрос обычным.
+  const { kind, ...plain } = q;
+  BY_ID.set(id, plain);
+  try {
+    const silly = d.session.ord.indexOf('s') + 1;
+    const res = d.say(String(silly));
+    assert.match(res.response.text, new RegExp(`Правильный ответ: ${q.right.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    assert.equal(d.session.sc, 0);
+    assert.equal(d.session.sl, 1);
+    assert.equal(d.session.i, 1);
+  } finally {
+    BY_ID.set(id, q);
+  }
 });
 
 test('в загадке (kind: guess) свои реакции, и смешная версия не считается вредным советом', () => {
