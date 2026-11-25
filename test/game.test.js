@@ -232,7 +232,8 @@ test('реакции не повторяются в серии из трёх о�
   d.say('лёгкий');
   d.say('десять вопросов');
   const { REACTIONS } = require('../src/reactions');
-  const all = Object.values(REACTIONS).flat();
+  // Самые длинные сначала: «Правильно!» — начало и других реакций («Правильно! Записываю очко.»).
+  const all = Object.values(REACTIONS).flat().sort((a, b) => b.length - a.length);
   const seen = [];
   for (let g = 0; g < 4; g++) {
     while (d.session.st === 'q') {
@@ -341,7 +342,9 @@ test('любой вариант из банка, сказанный целико
     for (const kind of ['r', 't', 's']) {
       const session = { st: 'q', lv: 2, ids: [q.id, 101], i: 0, sc: 0, sl: 0, ord: 'rts' };
       const out = handleTurn({ utterance: q[FIELD[kind]].toLowerCase(), session, app: {} }, seeded(1));
-      const ok = out.session.i === 1 && out.session.sc === (kind === 'r' ? 1 : 0) && out.session.sl === (kind === 's' ? 1 : 0);
+      // В загадке (kind: 'guess') смешная версия не считается вредным советом.
+      const silly = kind === 's' && q.kind !== 'guess' ? 1 : 0;
+      const ok = out.session.i === 1 && out.session.sc === (kind === 'r' ? 1 : 0) && out.session.sl === silly;
       if (!ok) failed.push(`#${q.id} ${kind}: «${q[FIELD[kind]]}»`);
     }
   }
